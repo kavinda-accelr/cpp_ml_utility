@@ -48,7 +48,7 @@ void upscaler(
     const unsigned int shape[] = {num_rows * scale_up_factor, num_columns * scale_up_factor, num_filters}; 
 
     const unsigned int num_items_per_mat_cell =  shape[dim::filters];
-    const unsigned int num_items_per_mat_row = shape[dim::columns] * shape[dim::filters];
+    const unsigned int num_items_per_mat_row = shape[dim::columns] * num_items_per_mat_cell;
     const T* arr_cptr = tensor_ptr;
     T* new_arr_cptr = scaled_up_tensor_ptr;
     for(unsigned int r=0; r<num_rows; r++)
