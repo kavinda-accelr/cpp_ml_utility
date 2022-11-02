@@ -97,7 +97,7 @@ public:
 
         std::cout << "Time in ms" << std::endl;
         std::cout
-            << std::left << std::setw(20) << "Bolck name"
+            << std::left << std::setw(25) << "Bolck name"
             << std::left << std::setw(20) << "CPU TIME USED"
             << std::left << std::setw(20) << "PROCESS_CPUTIME_ID"
             << std::left << std::setw(20) << "MONOTONIC"
@@ -116,7 +116,7 @@ public:
             const double t_real = m_time_data.at(name).t_real;
 
             std::cout
-                << std::left << std::setw(20) << name
+                << std::left << std::setw(25) << name
                 << std::left << std::setw(20) << t_cpu_time_used / cycles
                 << std::left << std::setw(20) << t_process_cpu / cycles
                 << std::left << std::setw(20) << t_monotonic / cycles

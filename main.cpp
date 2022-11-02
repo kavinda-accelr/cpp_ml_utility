@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <iomanip>
 #include <array>
@@ -207,7 +208,7 @@ void upsampler_benchmark(
         {
             tensor[i] = rand()%1000;
         }
-        Timer::Get().start("Upsampler-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters) + "-" +  std::to_string(num_filters));
+        Timer::Get().start("Upsampler-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters) + "-" +  std::to_string(scale_up_factor));
         upsampler(tensor.data(), new_tensor.data(), num_rows, num_columns, num_filters, scale_up_factor);
         Timer::Get().stop();
     }
@@ -215,11 +216,11 @@ void upsampler_benchmark(
 
 void benchmark()
 {
-    argmax_benchmark(224, 224, 21, 100);
-    argmax_benchmark(28, 28, 21, 100);
+    argmax_benchmark(224, 224, 21, 1000);
+    argmax_benchmark(28, 28, 21, 1000);
 
-    upsampler_benchmark(28, 28, 21, 8, 100);
-    upsampler_benchmark(28, 28, 1, 8, 100);
+    upsampler_benchmark(28, 28, 21, 8, 1000);
+    upsampler_benchmark(28, 28, 1, 8, 1000);
 
     Timer::Get().print_duration();
     Timer::Get().reset();
