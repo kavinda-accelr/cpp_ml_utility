@@ -53,10 +53,10 @@ void argmax_example()
 {
     unsigned int max_i = 0;
 
-    int arr_a[] = {4, 1, 7, 5, 3, 8, 5, 1};
-    const int arr_a_size = sizeof(arr_a)/sizeof(int);
+    int8_t arr_a[] = {4, 1, 7, 5, 3, 8, 5, 1};
+    const int arr_a_size = sizeof(arr_a)/sizeof(int8_t);
     max_i = argmax(arr_a, arr_a_size);
-    std::cout<<"Index : "<< max_i <<" - Value : "<<arr_a[max_i]<<std::endl;
+    std::cout<<"Index : "<< max_i <<" - Value : "<<(int)arr_a[max_i]<<std::endl;
 
     std::array<float, 8> arr_b = {-4.0f, 1.32f, 7.12f, 5.1f, 3.0f, -8.54f, 5.0f, 1.1f};
     max_i = argmax(arr_b.data() , arr_b.size());
@@ -73,20 +73,20 @@ void argmax_benchmark(
     const unsigned int size = num_rows * num_columns * num_filters;
     const unsigned int new_size = num_rows * num_columns;
 
-    std::vector<int> tensor(size);
-    std::vector<int> mat(new_size);
+    std::vector<int8_t> tensor(size);
+    std::vector<int8_t> mat(new_size);
 
     for(unsigned int c=0; c<cycles; c++)
     {
         srand(c);
-        for(int& i : tensor)
+        for(auto& i : tensor)
         {
             i = rand()%1000;
         }
 
         Timer::Get().start("Argmax-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
-        const int* ptr = tensor.data();
-        for(int& i : mat)
+        const int8_t* ptr = tensor.data();
+        for(auto& i : mat)
         {
             i = ptr[argmax(ptr, num_filters)];
             ptr += num_filters;
@@ -198,15 +198,15 @@ void upsampler_benchmark(
     const unsigned int new_num_filters = num_filters;
     const unsigned int new_size = new_num_rows * new_num_columns * new_num_filters;
 
-    std::vector<int> tensor(size);
-    std::vector<int> new_tensor(new_size);
+    std::vector<int8_t> tensor(size);
+    std::vector<int8_t> new_tensor(new_size);
 
     for(unsigned int c=0; c<cycles; c++)
     {
         srand(123);
         for(unsigned int i=0; i<size; i++)
         {
-            tensor[i] = rand()%1000;
+            tensor[i] = rand()%100;
         }
         Timer::Get().start("Upsampler-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters) + "-" +  std::to_string(scale_up_factor));
         upsampler(tensor.data(), new_tensor.data(), num_rows, num_columns, num_filters, scale_up_factor);
@@ -228,8 +228,8 @@ void benchmark()
 
 int main()
 {
-    // argmax_example();
-    // upsampler_example();
+    argmax_example();
+    upsampler_example();
 
     benchmark();
 
