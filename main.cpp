@@ -228,8 +228,8 @@ void benchmark()
 
 int main()
 {
-    argmax_example();
-    upsampler_example();
+    //argmax_example();
+    //upsampler_example();
 
     benchmark();
 
