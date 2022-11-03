@@ -5,6 +5,9 @@
 #include <array>
 #include <vector>
 #include <limits>
+#include <fstream>
+#include <sstream>
+#include <regex>
 
 #include "Timer.hpp"
 
@@ -332,7 +335,7 @@ void comp_vec(const std::vector<T> vec_1, const std::vector<T> vec_2)
     }
 }
 
-int main()
+void test()
 {
     //argmax_example();
     //upsampler_example();
@@ -346,6 +349,95 @@ int main()
 
     Timer::Get().print_duration();
     Timer::Get().reset();
+}
+
+std::vector<int> array_dimensions(std::vector<std::string> line_array) {
+
+    std::string s = line_array[0];
+    std::string delimiter_1 = "(";
+    std::string delimiter_2 = ")";
+    int str_start = s.find(delimiter_1) + 1;
+    int str_end = s.find(delimiter_2) - str_start;
+    std::string token = s.substr(str_start, str_end);
+    token = std::regex_replace(token, std::regex(","), "");
+
+    std::vector<int> arr;
+    std::stringstream sstream(token);
+    int temp;
+    while (sstream >> temp)
+        arr.push_back(temp);
+
+    return arr;
+
+}
+
+void vector_populator(
+    const std::string name,
+    std::vector<int8_t>& vec,
+    unsigned int& width,
+    unsigned int& height,
+    unsigned int& channel) 
+{
+
+    std::vector<std::string> arr;
+    std::vector<int> dim_array;
+
+    std::ifstream file(name);
+    if (!file.is_open())
+    {
+        std::cerr << "File not opened..\n";
+        exit(1);
+    }
+
+    std::string str;
+    while (getline(file, str))
+    {
+        arr.push_back(str);
+    }
+
+    dim_array = array_dimensions(arr);
+
+    width = dim_array[2];
+    height = dim_array[1];
+    channel = dim_array[3];
+
+    int count = 1;
+    for (unsigned int i = 0; i < height; i++) {
+        for (unsigned int j = 0; j < width; j++) {
+            for (unsigned int k = 0; k < channel; k++) {
+                vec.push_back(std::stof(arr[count]));
+                count++;
+            }
+        }
+    }
+}
+
+int main()
+{
+    std::vector<int8_t> input_tensor;
+    unsigned int input_width = 0;
+    unsigned int input_height = 0;
+    unsigned int input_channel = 0;
+    std::vector<int8_t> output_tensor;
+    unsigned int output_width = 0;
+    unsigned int output_height = 0;
+    unsigned int output_channel = 0;
+
+    vector_populator("..\\..\\fcn224_data\\o_62.txt", input_tensor, input_width, input_height, input_channel);
+    vector_populator("..\\..\\fcn224_data\\o_64.txt", output_tensor, output_width, output_height, output_channel);
+
+    std::vector<int8_t> mat(input_width*input_height);
+    const int8_t* ptr = input_tensor.data();
+    for(auto& i : mat)
+    {
+        i = argmax(ptr, input_channel);
+        ptr += input_channel;
+    }
+
+    std::vector<int8_t> output_tensor_algo(224*224);
+    upsampler(mat.data(), output_tensor_algo.data(), input_width, input_height, 1, 8);
+
+    comp_vec(output_tensor, output_tensor_algo);
 
     return 0;
 }
