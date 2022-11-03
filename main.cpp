@@ -104,7 +104,8 @@ void argmax_benchmark(
     const unsigned int num_rows,
     const unsigned int num_columns,
     const unsigned int num_filters,
-    const unsigned int cycles = 1000
+    const unsigned int cycles = 1000,
+    unsigned const int seed = 0
 )
 {
     const unsigned int size = num_rows * num_columns * num_filters;
@@ -113,7 +114,7 @@ void argmax_benchmark(
     std::vector<int8_t> tensor(size);
     std::vector<int8_t> mat(new_size);
 
-    srand(time(NULL));
+    srand(seed);
     for(unsigned int c=0; c<cycles; c++)
     {
         for(auto& i : tensor)
@@ -190,7 +191,8 @@ void upsampler_benchmark(
     const unsigned int num_columns,
     const unsigned int num_filters,
     const unsigned int scale_up_factor,
-    const unsigned int cycles = 1000
+    const unsigned int cycles = 1000,
+    unsigned const int seed = 0
 )
 {
     const unsigned int size = num_rows * num_columns * num_filters;
@@ -203,7 +205,7 @@ void upsampler_benchmark(
     std::vector<int8_t> tensor(size);
     std::vector<int8_t> new_tensor(new_size);
 
-    srand(time(NULL));
+    srand(seed);
     for(unsigned int c=0; c<cycles; c++)
     {
         for(unsigned int i=0; i<size; i++)
@@ -216,13 +218,13 @@ void upsampler_benchmark(
     }
 }
 
-void benchmark()
+void benchmark(unsigned const int seed)
 {
-    argmax_benchmark(224, 224, 21, 1000);
-    argmax_benchmark(28, 28, 21, 1000);
+    argmax_benchmark(224, 224, 21, 1000, seed);
+    argmax_benchmark(28, 28, 21, 1000, seed);
 
-    upsampler_benchmark(28, 28, 21, 8, 1000);
-    upsampler_benchmark(28, 28, 1, 8, 1000);    
+    upsampler_benchmark(28, 28, 21, 8, 1000, seed);
+    upsampler_benchmark(28, 28, 1, 8, 1000, seed);    
 }
 
 std::vector<int8_t> sim_up_scale_argmax(
@@ -242,9 +244,9 @@ std::vector<int8_t> sim_up_scale_argmax(
     std::vector<int8_t> scaled_up_tensor(scaled_up_tensor_size);
     std::vector<int8_t> scaled_up_mat(scaled_up_mat_size);
 
-    for(int c=0; c<100;c++)
+    srand(seed);
+    for(int c=0; c<1000;c++)
     {
-        srand(seed);
         for(auto& item : tensor)
         {
             item = rand()%256 - 128;
@@ -285,9 +287,9 @@ std::vector<int8_t> sim_argmax_up_scale(
     std::vector<int8_t> mat(mat_size);
     std::vector<int8_t> scaled_up_mat(scaled_up_mat_size);
 
-    for(int c=0; c<100;c++)
+    srand(seed);
+    for(int c=0; c<1000;c++)
     {
-        srand(seed);
         for(auto& item : tensor)
         {
             item = rand()%256 - 128;
@@ -334,16 +336,16 @@ int main()
 {
     //argmax_example();
     //upsampler_example();
-    //benchmark();
 
     unsigned const int seed = time(NULL);
     std::vector<int8_t> sim_1_out = sim_up_scale_argmax(28, 28, 21, 8, seed);
     std::vector<int8_t> sim_2_out = sim_argmax_up_scale(28, 28, 21, 8, seed);
+    comp_vec(sim_1_out, sim_2_out);
+
+    benchmark(seed);
 
     Timer::Get().print_duration();
     Timer::Get().reset();
-
-    comp_vec(sim_1_out, sim_2_out);
 
     return 0;
 }
