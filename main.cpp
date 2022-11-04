@@ -188,6 +188,42 @@ void argmax_old_benchmark(
     // print_tensor(mat.data(), num_rows, num_columns, 1);
 }
 
+void argmax_win_benchmark(
+    const unsigned int num_rows,
+    const unsigned int num_columns,
+    const unsigned int num_filters,
+    const unsigned int cycles = 1000,
+    unsigned const int seed = 0
+)
+{
+    const unsigned int size = num_rows * num_columns * num_filters;
+    const unsigned int new_size = num_rows * num_columns;
+
+    std::vector<int8_t> tensor(size);
+    std::vector<int8_t> mat(new_size);
+
+    srand(seed);
+    for(unsigned int c=0; c<cycles; c++)
+    {
+        for(auto& i : tensor)
+        {
+            i = rand()%256 - 128;
+        }
+
+        Timer::Get().start("Argmax win-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
+        const int8_t* ptr = tensor.data();
+        for(auto& i : mat)
+        {
+            i = std::max_element(ptr, ptr + num_filters) - ptr;
+            ptr += num_filters;
+        }
+        Timer::Get().stop();
+    }
+
+    // print_tensor(tensor.data(), num_rows, num_columns, num_filters);
+    // print_tensor(mat.data(), num_rows, num_columns, 1);
+}
+
 void upsampler_example()
 {
     // r, c, f
@@ -274,8 +310,10 @@ void benchmark(unsigned const int seed)
 {
     argmax_benchmark(224, 224, 21, 1000, seed);
     argmax_old_benchmark(224, 224, 21, 1000, seed);
+    argmax_win_benchmark(224, 224, 21, 1000, seed);
     argmax_benchmark(28, 28, 21, 1000, seed);
     argmax_old_benchmark(28, 28, 21, 1000, seed);
+    argmax_win_benchmark(28, 28, 21, 1000, seed);
 
     upsampler_benchmark(28, 28, 21, 8, 1000, seed);
     upsampler_benchmark(28, 28, 1, 8, 1000, seed);    
