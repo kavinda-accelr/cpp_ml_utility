@@ -51,6 +51,23 @@ unsigned int argmax(const T* const arr_ptr, unsigned const int size)
 }
 
 template<typename T>
+unsigned int argmax_old(const T* const arr_ptr, unsigned const int size)
+{
+    unsigned int max_val_index = 0;
+    T max_val = std::numeric_limits<T>().min();
+    for(unsigned int i = 0; i<size; i++)
+    {
+        if(arr_ptr[i] > max_val)
+        {
+            max_val = arr_ptr[i];
+            max_val_index = i;
+        }
+    }
+    return max_val_index;
+}
+
+
+template<typename T>
 void upsampler(
     const T* const tensor_ptr, 
     T* const scaled_up_tensor_ptr, 
@@ -126,6 +143,42 @@ void argmax_benchmark(
         for(auto& i : mat)
         {
             i = argmax(ptr, num_filters);
+            ptr += num_filters;
+        }
+        Timer::Get().stop();
+    }
+
+    // print_tensor(tensor.data(), num_rows, num_columns, num_filters);
+    // print_tensor(mat.data(), num_rows, num_columns, 1);
+}
+
+void argmax_old_benchmark(
+    const unsigned int num_rows,
+    const unsigned int num_columns,
+    const unsigned int num_filters,
+    const unsigned int cycles = 1000,
+    unsigned const int seed = 0
+)
+{
+    const unsigned int size = num_rows * num_columns * num_filters;
+    const unsigned int new_size = num_rows * num_columns;
+
+    std::vector<int8_t> tensor(size);
+    std::vector<int8_t> mat(new_size);
+
+    srand(seed);
+    for(unsigned int c=0; c<cycles; c++)
+    {
+        for(auto& i : tensor)
+        {
+            i = rand()%256 - 128;
+        }
+
+        Timer::Get().start("Argmax v1-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
+        const int8_t* ptr = tensor.data();
+        for(auto& i : mat)
+        {
+            i = argmax_old(ptr, num_filters);
             ptr += num_filters;
         }
         Timer::Get().stop();
@@ -220,7 +273,9 @@ void upsampler_benchmark(
 void benchmark(unsigned const int seed)
 {
     argmax_benchmark(224, 224, 21, 1000, seed);
+    argmax_old_benchmark(224, 224, 21, 1000, seed);
     argmax_benchmark(28, 28, 21, 1000, seed);
+    argmax_old_benchmark(28, 28, 21, 1000, seed);
 
     upsampler_benchmark(28, 28, 21, 8, 1000, seed);
     upsampler_benchmark(28, 28, 1, 8, 1000, seed);    
