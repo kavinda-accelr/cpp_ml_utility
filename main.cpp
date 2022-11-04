@@ -125,7 +125,7 @@ void argmax_benchmark(
         const int8_t* ptr = tensor.data();
         for(auto& i : mat)
         {
-            i = ptr[argmax(ptr, num_filters)];
+            i = argmax(ptr, num_filters);
             ptr += num_filters;
         }
         Timer::Get().stop();
@@ -257,7 +257,7 @@ std::vector<int8_t> sim_up_scale_argmax(
         const int8_t* ptr = scaled_up_tensor.data();
         for(auto& i : scaled_up_mat)
         {
-            i = ptr[argmax(ptr, num_filters)];
+            i = argmax(ptr, num_filters);
             ptr += num_filters;
         }
         Timer::Get().stop();
@@ -298,7 +298,7 @@ std::vector<int8_t> sim_argmax_up_scale(
         const int8_t* ptr = tensor.data();
         for(auto& i : mat)
         {
-            i = ptr[argmax(ptr, num_filters)];
+            i = argmax(ptr, num_filters);
             ptr += num_filters;
         }
         
