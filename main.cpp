@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <regex>
+#include <algorithm>
 
 #include "Timer.hpp"
 
@@ -41,17 +42,12 @@ void print_tensor(
 template<typename T>
 unsigned int argmax(const T* const arr_ptr, unsigned const int size)
 {
-    unsigned int max_val_index = 0;
-    T max_val = std::numeric_limits<T>().min();
-    for(unsigned int i = 0; i<size; i++)
+    const T* max_val_ptr = arr_ptr;
+    for(unsigned int i = 1; i<size; i++)
     {
-        if(arr_ptr[i] > max_val)
-        {
-            max_val = arr_ptr[i];
-            max_val_index = i;
-        }
+        max_val_ptr = arr_ptr[i] > *max_val_ptr ? (arr_ptr + i) : max_val_ptr;
     }
-    return max_val_index;
+    return (max_val_ptr - arr_ptr);
 }
 
 template<typename T>
@@ -412,7 +408,7 @@ void vector_populator(
     }
 }
 
-int main()
+void sim_model_outputs()
 {
     std::vector<int8_t> input_tensor;
     unsigned int input_width = 0;
@@ -438,6 +434,68 @@ int main()
     upsampler(mat.data(), output_tensor_algo.data(), input_width, input_height, 1, 8);
 
     comp_vec(output_tensor, output_tensor_algo);
+}
+
+void win_max_ele_vs_argmax()
+{
+    const unsigned int num_rows = 224;
+    const unsigned int num_columns = 224;
+    const unsigned int num_filters = 21;
+    const unsigned int cycles = 1000;
+    const unsigned int size = num_rows * num_columns * num_filters;
+    const unsigned int mat_size = num_rows * num_columns;
+
+    std::vector<int8_t> tensor(size);
+    std::vector<int8_t> mat_1(mat_size);
+    std::vector<int8_t> mat_2(mat_size);
+
+    srand(0);
+    for(unsigned int c=0; c<cycles; c++)
+    {
+        for(auto& i : tensor)
+        {
+            i = rand()%256 - 128;
+        }
+
+        Timer::Get().start("Argmax-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
+        const int8_t* ptr = tensor.data();
+        for(auto& i : mat_1)
+        {
+            i = argmax(ptr, num_filters);
+            ptr += num_filters;
+        }
+        Timer::Get().stop();
+    }
+
+    srand(0);
+    for(unsigned int c=0; c<cycles; c++)
+    {
+        for(auto& i : tensor)
+        {
+            i = rand()%256 - 128;
+        }
+
+        Timer::Get().start("Argmax win-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
+        const int8_t* ptr = tensor.data();
+        for(auto& i : mat_2)
+        {
+            i = std::max_element(ptr, ptr + num_filters) - ptr;
+            ptr += num_filters;
+        }
+        Timer::Get().stop();
+    }
+
+    Timer::Get(). print_duration();
+
+    //print_tensor(mat_1.data(), num_rows, num_columns, 1, true);
+    //print_tensor(mat_2.data(), num_rows, num_columns, 1, true);
+
+    comp_vec(mat_1, mat_2);
+}
+
+int main()
+{
+    test();
 
     return 0;
 }
