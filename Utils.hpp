@@ -13,6 +13,16 @@ inline unsigned int argmax(const T* const arr_ptr, unsigned const int size)
     return (max_val_ptr - arr_ptr);
 }
 
+template <typename T>
+void argmax_tensor(const T* tensor_ptr, T* const mat_ptr, const unsigned int num_filters, const unsigned int size)
+{
+    for(unsigned int i=0; i<size; i++)
+    {
+        mat_ptr[i] = argmax(tensor_ptr, num_filters);
+        tensor_ptr += num_filters;
+    }
+}
+
 template<typename T>
 void upsampler(
     const T* const tensor_ptr, 

@@ -9,8 +9,13 @@
 #include <regex>
 #include <algorithm>
 
+#include "Thread_Pool.hpp"
 #include "Utils.hpp"
 #include "Timer.hpp"
+
+#define NUM_THREADS 4
+
+static unsigned int cycles = 10;
 
 template<typename T>
 void print_tensor(
@@ -57,15 +62,15 @@ void argmax_benchmark(
     const unsigned int num_rows,
     const unsigned int num_columns,
     const unsigned int num_filters,
-    const unsigned int cycles = 1000,
-    unsigned const int seed = 0
+    const unsigned int cycles,
+    unsigned const int seed
 )
 {
     const unsigned int size = num_rows * num_columns * num_filters;
-    const unsigned int new_size = num_rows * num_columns;
+    const unsigned int mat_size = num_rows * num_columns;
 
     std::vector<int8_t> tensor(size);
-    std::vector<int8_t> mat(new_size);
+    std::vector<int8_t> mat(mat_size);
 
     srand(seed);
     for(unsigned int c=0; c<cycles; c++)
@@ -75,26 +80,18 @@ void argmax_benchmark(
             i = rand()%256 - 128;
         }
 
-        Timer::Get().start("Argmax v2-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
-        const int8_t* ptr = tensor.data();
-        for(auto& i : mat)
-        {
-            i = argmax(ptr, num_filters);
-            ptr += num_filters;
-        }
+        Timer::Get().start("Argmax -" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
+        argmax_tensor(tensor.data(), mat.data(), num_filters, mat_size);
         Timer::Get().stop();
     }
-
-    // print_tensor(tensor.data(), num_rows, num_columns, num_filters);
-    // print_tensor(mat.data(), num_rows, num_columns, 1);
 }
 
 void argmax_win_benchmark(
     const unsigned int num_rows,
     const unsigned int num_columns,
     const unsigned int num_filters,
-    const unsigned int cycles = 1000,
-    unsigned const int seed = 0
+    const unsigned int cycles,
+    unsigned const int seed
 )
 {
     const unsigned int size = num_rows * num_columns * num_filters;
@@ -124,6 +121,52 @@ void argmax_win_benchmark(
     // print_tensor(tensor.data(), num_rows, num_columns, num_filters);
     // print_tensor(mat.data(), num_rows, num_columns, 1);
 }
+
+void argmax_mt_benchmark(
+    const unsigned int num_rows,
+    const unsigned int num_columns,
+    const unsigned int num_filters,
+    const unsigned int cycles,
+    unsigned const int seed
+)
+{
+    const unsigned int size = num_rows * num_columns * num_filters;
+    const unsigned int mat_size = num_rows * num_columns;
+
+    std::vector<int8_t> tensor(size);
+    std::vector<int8_t> mat(mat_size);
+
+    srand(seed);
+    obj_detect::Thread_Pool thread_pool(NUM_THREADS);
+    
+    for(unsigned int c=0; c<cycles; c++)
+    {
+        for(auto& i : tensor)
+        {
+            i = rand()%256 - 128;
+        }
+
+        const unsigned int work_per_thread = mat_size/NUM_THREADS;
+        const unsigned int work_left = mat_size%NUM_THREADS;
+        
+        Timer::Get().start("Argmax MT-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
+        unsigned int i = 0;
+        for(i=0; i<NUM_THREADS; i++)
+        {
+            thread_pool.assign([&, i](){
+                argmax_tensor(
+                    tensor.data() + num_filters*work_per_thread*i, 
+                    mat.data() + work_per_thread*i, 
+                    num_filters, 
+                    (i < work_left ? work_per_thread + 1 : work_per_thread));
+            });
+        }
+
+        thread_pool.wait_until(NUM_THREADS);
+        Timer::Get().stop();
+    }
+}
+
 
 void upsampler_example()
 {
@@ -180,8 +223,8 @@ void upsampler_benchmark(
     const unsigned int num_columns,
     const unsigned int num_filters,
     const unsigned int scale_up_factor,
-    const unsigned int cycles = 1000,
-    unsigned const int seed = 0
+    const unsigned int cycles,
+    unsigned const int seed
 )
 {
     const unsigned int size = num_rows * num_columns * num_filters;
@@ -209,13 +252,15 @@ void upsampler_benchmark(
 
 void benchmark(unsigned const int seed)
 {
-    argmax_benchmark(224, 224, 21, 1000, seed);
-    argmax_win_benchmark(224, 224, 21, 1000, seed);
-    argmax_benchmark(28, 28, 21, 1000, seed);
-    argmax_win_benchmark(28, 28, 21, 1000, seed);
+    argmax_benchmark(224, 224, 21, cycles, seed);
+    argmax_win_benchmark(224, 224, 21, cycles, seed);
+    argmax_mt_benchmark(224, 224, 21, cycles, seed);
+    argmax_benchmark(28, 28, 21, cycles, seed);
+    argmax_win_benchmark(28, 28, 21, cycles, seed);
+    argmax_mt_benchmark(28, 28, 21, cycles, seed);
 
-    upsampler_benchmark(28, 28, 21, 8, 1000, seed);
-    upsampler_benchmark(28, 28, 1, 8, 1000, seed);    
+    upsampler_benchmark(28, 28, 21, 8, cycles, seed);
+    upsampler_benchmark(28, 28, 1, 8, cycles, seed);
 }
 
 std::vector<int8_t> sim_up_scale_argmax(
@@ -223,6 +268,7 @@ std::vector<int8_t> sim_up_scale_argmax(
     const unsigned int num_columns,
     const unsigned int num_filters,
     const unsigned int scale_up_factor,
+    const unsigned int cycles,
     unsigned const int seed)
 {
     const unsigned int tensor_size = num_rows * num_columns * num_filters;
@@ -236,7 +282,7 @@ std::vector<int8_t> sim_up_scale_argmax(
     std::vector<int8_t> scaled_up_mat(scaled_up_mat_size);
 
     srand(seed);
-    for(int c=0; c<1000;c++)
+    for(int c=0; c<cycles;c++)
     {
         for(auto& item : tensor)
         {
@@ -245,18 +291,9 @@ std::vector<int8_t> sim_up_scale_argmax(
         
         Timer::Get().start("up scale->argmax");
         upsampler(tensor.data(), scaled_up_tensor.data(), num_rows, num_columns, num_filters, scale_up_factor);
-
-        const int8_t* ptr = scaled_up_tensor.data();
-        for(auto& i : scaled_up_mat)
-        {
-            i = argmax(ptr, num_filters);
-            ptr += num_filters;
-        }
+        argmax_tensor(scaled_up_tensor.data(), scaled_up_mat.data(), num_filters, scaled_up_mat_size);
         Timer::Get().stop();
     }
-
-    //print_tensor(scaled_up_mat.data(), scaled_up_num_rows, scaled_up_num_columns, 1, true);
-    //std::cout<<std::endl;
 
     return scaled_up_mat;
 }
@@ -266,6 +303,7 @@ std::vector<int8_t> sim_argmax_up_scale(
     const unsigned int num_columns,
     const unsigned int num_filters,
     const unsigned int scale_up_factor,
+    const unsigned int cycles,
     unsigned const int seed)
 {
     const unsigned int tensor_size = num_rows * num_columns * num_filters;
@@ -279,7 +317,7 @@ std::vector<int8_t> sim_argmax_up_scale(
     std::vector<int8_t> scaled_up_mat(scaled_up_mat_size);
 
     srand(seed);
-    for(int c=0; c<1000;c++)
+    for(int c=0; c<cycles;c++)
     {
         for(auto& item : tensor)
         {
@@ -287,19 +325,10 @@ std::vector<int8_t> sim_argmax_up_scale(
         }
 
         Timer::Get().start("argmax->up scale");
-        const int8_t* ptr = tensor.data();
-        for(auto& i : mat)
-        {
-            i = argmax(ptr, num_filters);
-            ptr += num_filters;
-        }
-        
+        argmax_tensor(tensor.data(), mat.data(), num_filters, mat_size);
         upsampler(mat.data(), scaled_up_mat.data(), num_rows, num_columns, 1, scale_up_factor);
         Timer::Get().stop();
     }
-
-    //print_tensor(scaled_up_mat.data(), scaled_up_num_rows, scaled_up_num_columns, 1, true);
-    //std::cout<<std::endl;
 
     return scaled_up_mat;
 }
@@ -329,8 +358,8 @@ void test()
     //upsampler_example();
 
     unsigned const int seed = time(NULL);
-    std::vector<int8_t> sim_1_out = sim_up_scale_argmax(28, 28, 21, 8, seed);
-    std::vector<int8_t> sim_2_out = sim_argmax_up_scale(28, 28, 21, 8, seed);
+    std::vector<int8_t> sim_1_out = sim_up_scale_argmax(28, 28, 21, 8, cycles, seed);
+    std::vector<int8_t> sim_2_out = sim_argmax_up_scale(28, 28, 21, 8, cycles, seed);
     comp_vec(sim_1_out, sim_2_out);
 
     benchmark(seed);
@@ -339,8 +368,8 @@ void test()
     Timer::Get().reset();
 }
 
-std::vector<int> array_dimensions(std::vector<std::string> line_array) {
-
+std::vector<int> array_dimensions(std::vector<std::string> line_array) 
+{
     std::string s = line_array[0];
     std::string delimiter_1 = "(";
     std::string delimiter_2 = ")";
@@ -356,7 +385,6 @@ std::vector<int> array_dimensions(std::vector<std::string> line_array) {
         arr.push_back(temp);
 
     return arr;
-
 }
 
 void vector_populator(
@@ -433,7 +461,6 @@ void win_max_ele_vs_argmax()
     const unsigned int num_rows = 224;
     const unsigned int num_columns = 224;
     const unsigned int num_filters = 21;
-    const unsigned int cycles = 1000;
     const unsigned int size = num_rows * num_columns * num_filters;
     const unsigned int mat_size = num_rows * num_columns;
 
@@ -477,7 +504,9 @@ void win_max_ele_vs_argmax()
         Timer::Get().stop();
     }
 
-    Timer::Get(). print_duration();
+    Timer::Get().print_duration();
+    Timer::Get().reset();
+
 
     //print_tensor(mat_1.data(), num_rows, num_columns, 1, true);
     //print_tensor(mat_2.data(), num_rows, num_columns, 1, true);
