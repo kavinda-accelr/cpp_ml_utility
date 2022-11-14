@@ -3,7 +3,7 @@
 #include <cstring>
 
 template<typename T>
-unsigned int argmax(const T* const arr_ptr, unsigned const int size)
+inline unsigned int argmax(const T* const arr_ptr, unsigned const int size)
 {
     const T* max_val_ptr = arr_ptr;
     for(unsigned int i = 1; i<size; i++)
