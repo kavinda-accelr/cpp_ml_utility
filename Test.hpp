@@ -13,9 +13,9 @@
 #include "Utils.hpp"
 #include "Timer.hpp"
 
-#define NUM_THREADS 1000
+#define NUM_THREADS 4
 
-static unsigned int cycles = 1;
+static unsigned int cycles = 1000;
 
 template<typename T>
 void print_tensor(
