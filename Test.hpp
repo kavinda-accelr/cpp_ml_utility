@@ -13,9 +13,9 @@
 #include "Utils.hpp"
 #include "Timer.hpp"
 
-#define NUM_THREADS 4
+#define NUM_THREADS 1000
 
-static unsigned int cycles = 1000;
+static unsigned int cycles = 1;
 
 template<typename T>
 void print_tensor(
@@ -282,7 +282,12 @@ std::vector<int8_t> sim_up_scale_argmax(
     std::vector<int8_t> scaled_up_mat(scaled_up_mat_size);
 
     srand(seed);
-    for(int c=0; c<cycles;c++)
+
+    obj_detect::Thread_Pool thread_pool(NUM_THREADS);
+    const unsigned int work_per_thread = scaled_up_mat_size/NUM_THREADS;
+    const unsigned int work_left = scaled_up_mat_size%NUM_THREADS;
+
+    for(unsigned int c=0; c<cycles;c++)
     {
         for(auto& item : tensor)
         {
@@ -291,7 +296,21 @@ std::vector<int8_t> sim_up_scale_argmax(
         
         Timer::Get().start("up scale->argmax");
         upsampler(tensor.data(), scaled_up_tensor.data(), num_rows, num_columns, num_filters, scale_up_factor);
-        argmax_tensor(scaled_up_tensor.data(), scaled_up_mat.data(), num_filters, scaled_up_mat_size);
+        
+        unsigned int i = 0;
+        for(i=0; i<NUM_THREADS; i++)
+        {
+            thread_pool.assign([&, i](){
+                argmax_tensor(
+                    scaled_up_tensor.data() + num_filters*work_per_thread*i, 
+                    scaled_up_mat.data() + work_per_thread*i, 
+                    num_filters, 
+                    (i < work_left ? work_per_thread + 1 : work_per_thread));
+            });
+        }
+
+        thread_pool.wait_until(NUM_THREADS);
+
         Timer::Get().stop();
     }
 
@@ -317,15 +336,33 @@ std::vector<int8_t> sim_argmax_up_scale(
     std::vector<int8_t> scaled_up_mat(scaled_up_mat_size);
 
     srand(seed);
-    for(int c=0; c<cycles;c++)
+
+    obj_detect::Thread_Pool thread_pool(NUM_THREADS);
+    const unsigned int work_per_thread = mat_size/NUM_THREADS;
+    const unsigned int work_left = mat_size%NUM_THREADS;
+    
+    for(unsigned int c=0; c<cycles;c++)
     {
         for(auto& item : tensor)
         {
             item = rand()%256 - 128;
         }
-
+    
         Timer::Get().start("argmax->up scale");
-        argmax_tensor(tensor.data(), mat.data(), num_filters, mat_size);
+        unsigned int i = 0;
+        for(i=0; i<NUM_THREADS; i++)
+        {
+            thread_pool.assign([&, i](){
+                argmax_tensor(
+                    tensor.data() + num_filters*work_per_thread*i, 
+                    mat.data() + work_per_thread*i, 
+                    num_filters, 
+                    (i < work_left ? work_per_thread + 1 : work_per_thread));
+            });
+        }
+
+        thread_pool.wait_until(NUM_THREADS);
+
         upsampler(mat.data(), scaled_up_mat.data(), num_rows, num_columns, 1, scale_up_factor);
         Timer::Get().stop();
     }
@@ -454,62 +491,4 @@ void sim_model_outputs()
     upsampler(mat.data(), output_tensor_algo.data(), input_width, input_height, 1, 8);
 
     comp_vec(output_tensor, output_tensor_algo);
-}
-
-void win_max_ele_vs_argmax()
-{
-    const unsigned int num_rows = 224;
-    const unsigned int num_columns = 224;
-    const unsigned int num_filters = 21;
-    const unsigned int size = num_rows * num_columns * num_filters;
-    const unsigned int mat_size = num_rows * num_columns;
-
-    std::vector<int8_t> tensor(size);
-    std::vector<int8_t> mat_1(mat_size);
-    std::vector<int8_t> mat_2(mat_size);
-
-    srand(0);
-    for(unsigned int c=0; c<cycles; c++)
-    {
-        for(auto& i : tensor)
-        {
-            i = rand()%256 - 128;
-        }
-
-        Timer::Get().start("Argmax-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
-        const int8_t* ptr = tensor.data();
-        for(auto& i : mat_1)
-        {
-            i = argmax(ptr, num_filters);
-            ptr += num_filters;
-        }
-        Timer::Get().stop();
-    }
-
-    srand(0);
-    for(unsigned int c=0; c<cycles; c++)
-    {
-        for(auto& i : tensor)
-        {
-            i = rand()%256 - 128;
-        }
-
-        Timer::Get().start("Argmax win-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
-        const int8_t* ptr = tensor.data();
-        for(auto& i : mat_2)
-        {
-            i = std::max_element(ptr, ptr + num_filters) - ptr;
-            ptr += num_filters;
-        }
-        Timer::Get().stop();
-    }
-
-    Timer::Get().print_duration();
-    Timer::Get().reset();
-
-
-    //print_tensor(mat_1.data(), num_rows, num_columns, 1, true);
-    //print_tensor(mat_2.data(), num_rows, num_columns, 1, true);
-
-    comp_vec(mat_1, mat_2);
 }
