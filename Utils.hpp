@@ -13,12 +13,31 @@ inline unsigned int argmax(const T* const arr_ptr, unsigned const int size)
     return (max_val_ptr - arr_ptr);
 }
 
+/*
 template <typename T>
 void argmax_tensor(const T* tensor_ptr, T* const mat_ptr, const unsigned int num_filters, const unsigned int size)
 {
     for(unsigned int i=0; i<size; i++)
     {
         mat_ptr[i] = argmax(tensor_ptr, num_filters);
+        tensor_ptr += num_filters;
+    }
+}
+*/
+
+template <typename T>
+void argmax_tensor(const T* tensor_ptr, T* const mat_ptr, const unsigned int num_filters, const unsigned int size)
+{
+    const T* max_val_ptr = NULL;
+    unsigned int i, j;
+    for(i = 0; i<size; i++)
+    {
+        max_val_ptr = tensor_ptr;
+        for(j = 1; j<num_filters; j++)
+        {
+            max_val_ptr = tensor_ptr[j] > *max_val_ptr ? (tensor_ptr + j) : max_val_ptr;
+        }
+        mat_ptr[i] = max_val_ptr - tensor_ptr;
         tensor_ptr += num_filters;
     }
 }
