@@ -138,6 +138,10 @@ void argmax_mt_benchmark(
 
     srand(seed);
     obj_detect::Thread_Pool thread_pool(NUM_THREADS);
+    const unsigned int work_per_thread = mat_size/NUM_THREADS;
+    const unsigned int work_left = mat_size%NUM_THREADS;
+    unsigned int total_work_count = 0;
+    unsigned int work_count = 0;
     
     for(unsigned int c=0; c<cycles; c++)
     {
@@ -146,20 +150,19 @@ void argmax_mt_benchmark(
             i = rand()%256 - 128;
         }
 
-        const unsigned int work_per_thread = mat_size/NUM_THREADS;
-        const unsigned int work_left = mat_size%NUM_THREADS;
-        
         Timer::Get().start("Argmax MT-" + std::to_string(num_columns) + "x" + std::to_string(num_rows) + "x" + std::to_string(num_filters));
-        unsigned int i = 0;
-        for(i=0; i<NUM_THREADS; i++)
+        total_work_count = 0;
+        for(unsigned int i=0; i<NUM_THREADS; i++)
         {
-            thread_pool.assign([&, i](){
+            work_count = (i < work_left ? work_per_thread + 1 : work_per_thread);
+            thread_pool.assign([&, total_work_count, work_count](){
                 argmax_tensor(
-                    tensor.data() + num_filters*work_per_thread*i, 
-                    mat.data() + work_per_thread*i, 
+                    tensor.data() + num_filters*total_work_count, 
+                    mat.data() + total_work_count, 
                     num_filters, 
-                    (i < work_left ? work_per_thread + 1 : work_per_thread));
+                    work_count);
             });
+            total_work_count += work_count;
         }
 
         thread_pool.wait_until(NUM_THREADS);
@@ -206,9 +209,8 @@ void upsampler_example()
     print_tensor(new_arr.data(), new_num_rows, new_num_columns, new_num_filters);
     
     // example for vector
-    std::vector<int> new_vec;
     // Important : allocate memory
-    new_vec.reserve(new_size);
+    std::vector<int> new_vec(new_size);
 
     upsampler(arr.data(), new_vec.data(), num_rows, num_columns, num_filters, scale_up_factor);
 
@@ -286,6 +288,8 @@ std::vector<int8_t> sim_up_scale_argmax(
     obj_detect::Thread_Pool thread_pool(NUM_THREADS);
     const unsigned int work_per_thread = scaled_up_mat_size/NUM_THREADS;
     const unsigned int work_left = scaled_up_mat_size%NUM_THREADS;
+    unsigned int total_work_count = 0;
+    unsigned int work_count = 0;
 
     for(unsigned int c=0; c<cycles;c++)
     {
@@ -296,21 +300,21 @@ std::vector<int8_t> sim_up_scale_argmax(
         
         Timer::Get().start("up scale->argmax");
         upsampler(tensor.data(), scaled_up_tensor.data(), num_rows, num_columns, num_filters, scale_up_factor);
-        
-        unsigned int i = 0;
-        for(i=0; i<NUM_THREADS; i++)
+        total_work_count = 0;
+        for(unsigned int i=0; i<NUM_THREADS; i++)
         {
-            thread_pool.assign([&, i](){
+            work_count = (i < work_left ? work_per_thread + 1 : work_per_thread);
+            thread_pool.assign([total_work_count, work_count, &num_filters, &scaled_up_tensor, &scaled_up_mat](){
                 argmax_tensor(
-                    scaled_up_tensor.data() + num_filters*work_per_thread*i, 
-                    scaled_up_mat.data() + work_per_thread*i, 
+                    scaled_up_tensor.data() + num_filters*total_work_count, 
+                    scaled_up_mat.data() + total_work_count, 
                     num_filters, 
-                    (i < work_left ? work_per_thread + 1 : work_per_thread));
+                    work_count);
             });
+            total_work_count += work_count;
         }
 
         thread_pool.wait_until(NUM_THREADS);
-
         Timer::Get().stop();
     }
 
@@ -340,6 +344,8 @@ std::vector<int8_t> sim_argmax_up_scale(
     obj_detect::Thread_Pool thread_pool(NUM_THREADS);
     const unsigned int work_per_thread = mat_size/NUM_THREADS;
     const unsigned int work_left = mat_size%NUM_THREADS;
+    unsigned int total_work_count = 0;
+    unsigned int work_count = 0;
     
     for(unsigned int c=0; c<cycles;c++)
     {
@@ -349,16 +355,18 @@ std::vector<int8_t> sim_argmax_up_scale(
         }
     
         Timer::Get().start("argmax->up scale");
-        unsigned int i = 0;
-        for(i=0; i<NUM_THREADS; i++)
+        total_work_count = 0;
+        for(unsigned int i=0; i<NUM_THREADS; i++)
         {
-            thread_pool.assign([&, i](){
+            work_count = (i < work_left ? work_per_thread + 1 : work_per_thread);
+            thread_pool.assign([total_work_count, work_count, &num_filters, &tensor, &mat](){
                 argmax_tensor(
-                    tensor.data() + num_filters*work_per_thread*i, 
-                    mat.data() + work_per_thread*i, 
+                    tensor.data() + num_filters*total_work_count, 
+                    mat.data() + total_work_count, 
                     num_filters, 
-                    (i < work_left ? work_per_thread + 1 : work_per_thread));
+                    work_count);
             });
+            total_work_count += work_count;
         }
 
         thread_pool.wait_until(NUM_THREADS);
@@ -383,7 +391,7 @@ void comp_vec(const std::vector<T> vec_1, const std::vector<T> vec_2)
     {
         if(vec_1[i] != vec_2[i])
         {
-            std::cerr<<"value mismatch\n";
+            std::cerr<<"value mismatch : "<< (int)vec_1[i]<< " != " << (int)vec_2[i] <<std::endl;
             return;
         }
     }
