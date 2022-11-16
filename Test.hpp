@@ -395,11 +395,11 @@ void test_argmax_mt()
 {
     for(unsigned int i=0; i<10; i++)
     {
-        srand(time(NULL));
-        const unsigned int num_theads = rand()%30 + 1;
-        const unsigned int num_columns = rand()%1000 + 1;
-        const unsigned int num_rows = rand()%1000 + 1;;
-        const unsigned int num_filters = rand()%1000 + 1;;
+        srand(time(NULL)+i*10);
+        const unsigned int num_theads = rand()%15 + 1;
+        const unsigned int num_columns = rand()%200 + 1;
+        const unsigned int num_rows = rand()%200 + 1;;
+        const unsigned int num_filters = rand()%200 + 1;;
 
         const unsigned int tensor_size = num_columns*num_rows*num_filters;
         const unsigned int mat_size = num_columns*num_rows;
@@ -412,16 +412,14 @@ void test_argmax_mt()
         fill_vec(tensor);
 
         argmax_tensor(tensor.data(), mat_1.data(), num_filters, mat_size);
-
         argmax_tensor_mt(tensor.data(), mat_2.data(), num_filters, mat_size, thread_pool);
 
         comp_vec(mat_1, mat_2);
 
-        std::cout<<"I : "<< i<<std::endl;
-        std::cout<<"T : "<< num_theads<<std::endl;
-        std::cout<<"C : "<< num_columns<<std::endl;
-        std::cout<<"R : "<< num_rows<<std::endl;
+        std::cout<<"I : "<< i<<" | ";
+        std::cout<<"T : "<< num_theads<<" | ";
+        std::cout<<"C : "<< num_columns<<" | ";
+        std::cout<<"R : "<< num_rows<<" | ";
         std::cout<<"F : "<< num_filters<<std::endl;
-        std::cout<<std::endl;
     }
 }
