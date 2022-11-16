@@ -15,7 +15,7 @@
 
 #define NUM_THREADS 4
 
-static unsigned int cycles = 1000;
+static unsigned int cycles = 10;
 
 template<typename T>
 void print_tensor(
