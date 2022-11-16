@@ -1,48 +1,17 @@
 #pragma once
 
 #include <iostream>
-#include <iomanip>
 #include <array>
 #include <vector>
-#include <fstream>
-#include <sstream>
-#include <regex>
-#include <algorithm>
 
 #include "Thread_Pool.hpp"
 #include "Utils.hpp"
+#include "Tools.hpp"
 #include "Timer.hpp"
 
 #define NUM_THREADS 4
 
 static unsigned int cycles = 1000;
-
-template<typename T>
-void print_tensor(
-    const T* const tensor_ptr,
-    const unsigned int num_rows, 
-    const unsigned int num_columns, 
-    const unsigned int num_filters,
-    bool cast_to_int_for_print = false
-)
-{
-    int i=0;
-    for(unsigned int r=0; r<num_rows; r++)
-    {
-        for(unsigned int c=0; c<num_columns; c++)
-        {
-            std::cout<<"( ";
-            for(unsigned int f=0; f<num_filters; f++)
-            {
-                if(!cast_to_int_for_print) std::cout<<std::setw(4)<<tensor_ptr[i]<<" ";
-                else std::cout<<std::setw(4)<<(int)tensor_ptr[i]<<" ";
-                i++;
-            }
-            std::cout<<") ";
-        }
-        std::cout<<std::endl;
-    }
-}
 
 void argmax_example()
 {
@@ -378,25 +347,6 @@ std::vector<int8_t> sim_argmax_up_scale(
     return scaled_up_mat;
 }
 
-template <typename T>
-void comp_vec(const std::vector<T> vec_1, const std::vector<T> vec_2)
-{
-    if(vec_1.size() != vec_2.size())
-    {
-        std::cerr<<"size mismatch\n";
-        return;
-    }
-
-    for(int i=0; i<vec_1.size(); i++)
-    {
-        if(vec_1[i] != vec_2[i])
-        {
-            std::cerr<<"value mismatch : "<< (int)vec_1[i]<< " != " << (int)vec_2[i] <<std::endl;
-            return;
-        }
-    }
-}
-
 void test()
 {
     //argmax_example();
@@ -411,66 +361,6 @@ void test()
 
     Timer::Get().print_duration();
     Timer::Get().reset();
-}
-
-std::vector<int> array_dimensions(std::vector<std::string> line_array) 
-{
-    std::string s = line_array[0];
-    std::string delimiter_1 = "(";
-    std::string delimiter_2 = ")";
-    int str_start = s.find(delimiter_1) + 1;
-    int str_end = s.find(delimiter_2) - str_start;
-    std::string token = s.substr(str_start, str_end);
-    token = std::regex_replace(token, std::regex(","), "");
-
-    std::vector<int> arr;
-    std::stringstream sstream(token);
-    int temp;
-    while (sstream >> temp)
-        arr.push_back(temp);
-
-    return arr;
-}
-
-void vector_populator(
-    const std::string name,
-    std::vector<int8_t>& vec,
-    unsigned int& width,
-    unsigned int& height,
-    unsigned int& channel) 
-{
-
-    std::vector<std::string> arr;
-    std::vector<int> dim_array;
-
-    std::ifstream file(name);
-    if (!file.is_open())
-    {
-        std::cerr << "File not opened..\n";
-        exit(1);
-    }
-
-    std::string str;
-    while (getline(file, str))
-    {
-        arr.push_back(str);
-    }
-
-    dim_array = array_dimensions(arr);
-
-    width = dim_array[2];
-    height = dim_array[1];
-    channel = dim_array[3];
-
-    int count = 1;
-    for (unsigned int i = 0; i < height; i++) {
-        for (unsigned int j = 0; j < width; j++) {
-            for (unsigned int k = 0; k < channel; k++) {
-                vec.push_back(std::stof(arr[count]));
-                count++;
-            }
-        }
-    }
 }
 
 void sim_model_outputs()
@@ -499,4 +389,39 @@ void sim_model_outputs()
     upsampler(mat.data(), output_tensor_algo.data(), input_width, input_height, 1, 8);
 
     comp_vec(output_tensor, output_tensor_algo);
+}
+
+void test_argmax_mt()
+{
+    for(unsigned int i=0; i<10; i++)
+    {
+        srand(time(NULL));
+        const unsigned int num_theads = rand()%30 + 1;
+        const unsigned int num_columns = rand()%1000 + 1;
+        const unsigned int num_rows = rand()%1000 + 1;;
+        const unsigned int num_filters = rand()%1000 + 1;;
+
+        const unsigned int tensor_size = num_columns*num_rows*num_filters;
+        const unsigned int mat_size = num_columns*num_rows;
+
+        obj_detect::Thread_Pool thread_pool(num_theads);
+        std::vector<int8_t> tensor(tensor_size);
+        std::vector<int8_t> mat_1(mat_size);
+        std::vector<int8_t> mat_2(mat_size);
+
+        fill_vec(tensor);
+
+        argmax_tensor(tensor.data(), mat_1.data(), num_filters, mat_size);
+
+        argmax_tensor_mt(tensor.data(), mat_2.data(), num_filters, mat_size, thread_pool);
+
+        comp_vec(mat_1, mat_2);
+
+        std::cout<<"I : "<< i<<std::endl;
+        std::cout<<"T : "<< num_theads<<std::endl;
+        std::cout<<"C : "<< num_columns<<std::endl;
+        std::cout<<"R : "<< num_rows<<std::endl;
+        std::cout<<"F : "<< num_filters<<std::endl;
+        std::cout<<std::endl;
+    }
 }
